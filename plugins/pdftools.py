@@ -1,5 +1,5 @@
 # Ultroid - UserBot
-# Copyright (C) 2021 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
@@ -30,55 +30,66 @@ import shutil
 import time
 
 import cv2
-import imutils
 import numpy as np
-import PIL
-from imutils.perspective import four_point_transform
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+    LOGS.info(f"{__file__}: PIL  not Installed.")
 from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
-from skimage.filters import threshold_local
 from telethon.errors.rpcerrorlist import PhotoSaveFileInvalidError
 
-from . import *
+from pyUltroid.fns.tools import four_point_transform
+
+from . import (
+    HNDLR,
+    LOGS,
+    bash,
+    check_filename,
+    downloader,
+    eor,
+    get_string,
+    ultroid_cmd,
+)
 
 if not os.path.isdir("pdf"):
     os.mkdir("pdf")
 
 
 @ultroid_cmd(
-    pattern="pdf ?(.*)",
+    pattern="pdf( (.*)|$)",
 )
 async def pdfseimg(event):
     ok = await event.get_reply_message()
-    msg = event.pattern_match.group(1)
+    msg = event.pattern_match.group(1).strip()
     if not (ok and (ok.document and (ok.document.mime_type == "application/pdf"))):
-        await eor(event, "`Reply The pdf u Want to Download..`")
+        await event.eor("`Reply The pdf u Want to Download..`")
         return
-    xx = await eor(event, "Processing...")
+    xx = await event.eor(get_string("com_1"))
     file = ok.media.document
     k = time.time()
     filename = "hehe.pdf"
     result = await downloader(
-        "pdf/" + filename,
-        file,
-        xx,
-        k,
-        "Downloading " + filename + "...",
+        f"pdf/{filename}", file, xx, k, f"Downloading {filename}..."
     )
+
     await xx.delete()
     pdfp = "pdf/hehe.pdf"
     pdfp.replace(".pdf", "")
     pdf = PdfFileReader(pdfp)
     if not msg:
+        ok = []
         for num in range(pdf.numPages):
             pw = PdfFileWriter()
             pw.addPage(pdf.getPage(num))
-            with open(os.path.join("pdf/ult{}.png".format(num + 1)), "wb") as f:
+            fil = os.path.join(f"pdf/ult{num + 1}.png")
+            ok.append(fil)
+            with open(fil, "wb") as f:
                 pw.write(f)
         os.remove(pdfp)
-        afl = glob.glob("pdf/*")
-        ok = [*sorted(afl)]
         for z in ok:
-            await event.client.send_file(event.chat_id, z, album=True)
+            await event.client.send_file(event.chat_id, z)
         shutil.rmtree("pdf")
         os.mkdir("pdf")
         await xx.delete()
@@ -94,7 +105,7 @@ async def pdfseimg(event):
             )
             os.remove("ult.png")
         os.remove(pdfp)
-    elif msg:
+    else:
         o = int(msg) - 1
         pw = PdfFileWriter()
         pw.addPage(pdf.getPage(o))
@@ -109,25 +120,19 @@ async def pdfseimg(event):
 
 
 @ultroid_cmd(
-    pattern="pdtext ?(.*)",
+    pattern="pdtext( (.*)|$)",
 )
 async def pdfsetxt(event):
     ok = await event.get_reply_message()
-    msg = event.pattern_match.group(1)
+    msg = event.pattern_match.group(1).strip()
     if not ok and ok.document and ok.document.mime_type == "application/pdf":
-        await eor(event, "`Reply The pdf u Want to Download..`")
+        await event.eor("`Reply The pdf u Want to Download..`")
         return
-    xx = await eor(event, "`Processing...`")
+    xx = await event.eor(get_string("com_1"))
     file = ok.media.document
     k = time.time()
     filename = ok.file.name
-    result = await downloader(
-        filename,
-        file,
-        xx,
-        k,
-        "Downloading " + filename + "...",
-    )
+    result = await downloader(filename, file, xx, k, f"Downloading {filename}...")
     await xx.delete()
     dl = result.name
     if not msg:
@@ -137,7 +142,7 @@ async def pdfsetxt(event):
             for page_num in range(pdf.numPages):
                 pageObj = pdf.getPage(page_num)
                 txt = pageObj.extractText()
-                f.write("Page {}\n".format(page_num + 1))
+                f.write(f"Page {page_num + 1}\n")
                 f.write("".center(100, "-"))
                 f.write(txt)
         await event.client.send_file(
@@ -151,55 +156,50 @@ async def pdfsetxt(event):
     if "-" in msg:
         u, d = msg.split("-")
         a = PdfFileReader(dl)
-        str = ""
-        for i in range(int(u) - 1, int(d)):
-            str += a.getPage(i).extractText()
+        str = "".join(a.getPage(i).extractText() for i in range(int(u) - 1, int(d)))
         text = f"{dl.split('.')[0]} {msg}.txt"
-        with open(text, "w") as f:
-            f.write(str)
-        await event.client.send_file(
-            event.chat_id,
-            text,
-            reply_to=event.reply_to_msg_id,
-        )
-        os.remove(text)
-        os.remove(dl)
     else:
         u = int(msg) - 1
         a = PdfFileReader(dl)
         str = a.getPage(u).extractText()
         text = f"{dl.split('.')[0]} Pg-{msg}.txt"
-        with open(text, "w") as f:
-            f.write(str)
-        await event.client.send_file(
-            event.chat_id,
-            text,
-            reply_to=event.reply_to_msg_id,
-        )
-        os.remove(text)
-        os.remove(dl)
+
+    with open(text, "w") as f:
+        f.write(str)
+    await event.client.send_file(
+        event.chat_id,
+        text,
+        reply_to=event.reply_to_msg_id,
+    )
+    os.remove(text)
+    os.remove(dl)
 
 
 @ultroid_cmd(
-    pattern="pdscan ?(.*)",
+    pattern="pdscan( (.*)|$)",
 )
 async def imgscan(event):
     ok = await event.get_reply_message()
     if not (ok and (ok.media)):
-        await eor(event, "`Reply The pdf u Want to Download..`")
+        await event.eor("`Reply The pdf u Want to Download..`")
+        return
+    if not (
+        ok.photo
+        or (ok.file.name and ok.file.name.endswith(("png", "jpg", "jpeg", "webp")))
+    ):
+        await event.eor("`Reply to a Image only...`")
         return
     ultt = await ok.download_media()
-    if not ultt.endswith(("png", "jpg", "jpeg", "webp")):
-        await eor(event, "`Reply to a Image only...`")
-        os.remove(ultt)
-        return
-    xx = await eor(event, "`Processing...`")
+    xx = await event.eor(get_string("com_1"))
     image = cv2.imread(ultt)
     original_image = image.copy()
     ratio = image.shape[0] / 500.0
-    image = imutils.resize(image, height=500)
+    hi, wid = image.shape[:2]
+    ra = 500 / float(hi)
+    dmes = (int(wid * ra), 500)
+    image = cv2.resize(image, dmes, interpolation=cv2.INTER_AREA)
     image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
-    image_y = np.zeros(image_yuv.shape[0:2], np.uint8)
+    image_y = np.zeros(image_yuv.shape[:2], np.uint8)
     image_y[:, :] = image_yuv[:, :, 0]
     image_blurred = cv2.GaussianBlur(image_y, (3, 3), 0)
     edges = cv2.Canny(image_blurred, 50, 200, apertureSize=3)
@@ -216,6 +216,14 @@ async def imgscan(event):
         cv2.drawContours(image, sortedPoly[0], -1, (0, 0, 255), 5)
         simplified_cnt = sortedPoly[0]
     if len(simplified_cnt) == 4:
+        try:
+            from skimage.filters import threshold_local
+        except ImportError:
+            LOGS.info(f"Scikit-Image is not Installed.")
+            await xx.edit("`Installing Scikit-Image...\nThis may take some long...`")
+            _, __ = await bash("pip install scikit-image")
+            LOGS.info(_)
+            from skimage.filters import threshold_local
         cropped_image = four_point_transform(
             original_image,
             simplified_cnt.reshape(4, 2) * ratio,
@@ -226,7 +234,7 @@ async def imgscan(event):
     if len(simplified_cnt) != 4:
         ok = cv2.detailEnhance(original_image, sigma_s=10, sigma_r=0.15)
     cv2.imwrite("o.png", ok)
-    image1 = PIL.Image.open("o.png")
+    image1 = Image.open("o.png")
     im1 = image1.convert("RGB")
     scann = f"Scanned {ultt.split('.')[0]}.pdf"
     im1.save(scann)
@@ -238,7 +246,7 @@ async def imgscan(event):
 
 
 @ultroid_cmd(
-    pattern="pdsave ?(.*)",
+    pattern="pdsave( (.*)|$)",
 )
 async def savepdf(event):
     ok = await event.get_reply_message()
@@ -250,13 +258,15 @@ async def savepdf(event):
         return
     ultt = await ok.download_media()
     if ultt.endswith(("png", "jpg", "jpeg", "webp")):
-        xx = await eor(event, "`Processing...`")
+        xx = await event.eor(get_string("com_1"))
         image = cv2.imread(ultt)
         original_image = image.copy()
         ratio = image.shape[0] / 500.0
-        image = imutils.resize(image, height=500)
+        h_, _v = image.shape[:2]
+        m_ = 500 / float(h_)
+        image = cv2.resize(image, (int(_v * m_), 500), interpolation=cv2.INTER_AREA)
         image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
-        image_y = np.zeros(image_yuv.shape[0:2], np.uint8)
+        image_y = np.zeros(image_yuv.shape[:2], np.uint8)
         image_y[:, :] = image_yuv[:, :, 0]
         image_blurred = cv2.GaussianBlur(image_y, (3, 3), 0)
         edges = cv2.Canny(image_blurred, 50, 200, apertureSize=3)
@@ -275,6 +285,16 @@ async def savepdf(event):
             cv2.drawContours(image, sortedPoly[0], -1, (0, 0, 255), 5)
             simplified_cnt = sortedPoly[0]
         if len(simplified_cnt) == 4:
+            try:
+                from skimage.filters import threshold_local
+            except ImportError:
+                LOGS.info(f"Scikit-Image is not Installed.")
+                await xx.edit(
+                    "`Installing Scikit-Image...\nThis may take some long...`"
+                )
+                _, __ = await bash("pip install scikit-image")
+                LOGS.info(_)
+                from skimage.filters import threshold_local
             cropped_image = four_point_transform(
                 original_image,
                 simplified_cnt.reshape(4, 2) * ratio,
@@ -285,28 +305,28 @@ async def savepdf(event):
         if len(simplified_cnt) != 4:
             ok = cv2.detailEnhance(original_image, sigma_s=10, sigma_r=0.15)
         cv2.imwrite("o.png", ok)
-        image1 = PIL.Image.open("o.png")
+        image1 = Image.open("o.png")
         im1 = image1.convert("RGB")
-        a = dani_ck("pdf/scan.pdf")
+        a = check_filename("pdf/scan.pdf")
         im1.save(a)
         await xx.edit(
-            f"Done, Now Reply Another Image/pdf if completed then use {hndlr}pdsend to merge nd send all as pdf",
+            f"Done, Now Reply Another Image/pdf if completed then use {HNDLR}pdsend to merge nd send all as pdf",
         )
         os.remove("o.png")
     elif ultt.endswith(".pdf"):
-        a = dani_ck("pdf/scan.pdf")
+        a = check_filename("pdf/scan.pdf")
         await event.client.download_media(ok, a)
         await eor(
             event,
-            f"Done, Now Reply Another Image/pdf if completed then use {hndlr}pdsend to merge nd send all as pdf",
+            f"Done, Now Reply Another Image/pdf if completed then use {HNDLR}pdsend to merge nd send all as pdf",
         )
     else:
-        await eor(event, "`Reply to a Image/pdf only...`")
+        await event.eor("`Reply to a Image/pdf only...`")
     os.remove(ultt)
 
 
 @ultroid_cmd(
-    pattern="pdsend ?(.*)",
+    pattern="pdsend( (.*)|$)",
 )
 async def sendpdf(event):
     if not os.path.exists("pdf/scan.pdf"):
@@ -315,19 +335,16 @@ async def sendpdf(event):
             "first select pages by replying .pdsave of which u want to make multi page pdf file",
         )
         return
-    msg = event.pattern_match.group(1)
-    if msg:
-        ok = f"{msg}.pdf"
-    else:
-        ok = "My PDF File.pdf"
+    msg = event.pattern_match.group(1).strip()
+    ok = f"{msg}.pdf" if msg else "My PDF File.pdf"
     merger = PdfFileMerger()
     afl = glob.glob("pdf/*")
-    ok = [*sorted(afl)]
-    for item in ok:
+    ok_ = [*sorted(afl)]
+    for item in ok_:
         if item.endswith("pdf"):
             merger.append(item)
     merger.write(ok)
-    await event.client.send_file(event.chat_id, ok, reply_to=event.reply_to_msg_id)
-    os.remove(ok)
+    await event.client.send_file(event.chat_id, ok_, reply_to=event.reply_to_msg_id)
+    os.remove(ok_)
     shutil.rmtree("pdf/")
     os.makedirs("pdf/")

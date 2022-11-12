@@ -1,5 +1,5 @@
 # Ultroid - UserBot
-# Copyright (C) 2021 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
@@ -16,15 +16,15 @@
 """
 from PIL import Image
 
-from . import *
+from . import HNDLR, eor, get_string, os, ultroid_cmd
 
 
 @ultroid_cmd(pattern="size$")
 async def size(e):
     r = await e.get_reply_message()
     if not (r and r.media):
-        return await eor(e, "`Reply To image`")
-    k = await eor(e, "`Processing...`")
+        return await e.eor(get_string("ascii_1"))
+    k = await e.eor(get_string("com_1"))
     if hasattr(r.media, "document"):
         img = await e.client.download_media(r, thumb=-1)
     else:
@@ -35,22 +35,26 @@ async def size(e):
     os.remove(img)
 
 
-@ultroid_cmd(pattern="resize ?(.*)")
+@ultroid_cmd(pattern="resize( (.*)|$)")
 async def size(e):
     r = await e.get_reply_message()
     if not (r and r.media):
-        return await eor(e, "`Reply To image`")
-    sz = e.pattern_match.group(1)
+        return await e.eor(get_string("ascii_1"))
+    sz = e.pattern_match.group(1).strip()
     if not sz:
-        return await eod(f"Give Some Size To Resize, Like `{HNDLR}resize 720 1080` ")
-    k = await eor(e, "`Processing...`")
+        return await eor(
+            f"Give Some Size To Resize, Like `{HNDLR}resize 720 1080` ", time=5
+        )
+    k = await e.eor(get_string("com_1"))
     if hasattr(r.media, "document"):
         img = await e.client.download_media(r, thumb=-1)
     else:
         img = await r.download_media()
     sz = sz.split()
-    if not len(sz) == 2:
-        return await eod(f"Give Some Size To Resize, Like `{HNDLR}resize 720 1080` ")
+    if len(sz) != 2:
+        return await eor(
+            k, f"Give Some Size To Resize, Like `{HNDLR}resize 720 1080` ", time=5
+        )
     x, y = int(sz[0]), int(sz[1])
     im = Image.open(img)
     ok = im.resize((x, y))

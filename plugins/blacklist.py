@@ -1,76 +1,71 @@
 # Ultroid - UserBot
-# Copyright (C) 2021 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
 # <https://www.github.com/TeamUltroid/Ultroid/blob/main/LICENSE/>.
 
-"""
-✘ Commands Available -
+from . import get_help
 
-• `{i}blacklist <word/all words with a space>`
-    blacklist the choosen word in that chat.
-
-• `{i}remblacklist <word>`
-    Remove the word from blacklist..
-
-• `{i}listblacklist`
-    list all blacklisted words.
-
-  'if a person uses blacklist Word his/her msg will be deleted'
-  'And u Must be Admin in that Chat'
-"""
+__doc__ = get_help("help_blacklist")
 
 
-from pyUltroid.functions.blacklist_db import *
+from pyUltroid.dB.blacklist_db import (
+    add_blacklist,
+    get_blacklist,
+    list_blacklist,
+    rem_blacklist,
+)
 
-from . import *
+from . import events, get_string, udB, ultroid_bot, ultroid_cmd
 
 
-@ultroid_cmd(pattern="blacklist ?(.*)", admins_only=True)
+@ultroid_cmd(pattern="blacklist( (.*)|$)", admins_only=True)
 async def af(e):
-    wrd = e.pattern_match.group(1)
+    wrd = e.pattern_match.group(1).strip()
     chat = e.chat_id
     if not (wrd):
-        return await eod(e, "`Give the word to blacklist..`")
+        return await e.eor(get_string("blk_1"), time=5)
     wrd = e.text[11:]
     heh = wrd.split(" ")
     for z in heh:
         add_blacklist(int(chat), z.lower())
-    await eor(e, f"Done : `{wrd}` Blacklisted here.")
+    ultroid_bot.add_handler(blacklist, events.NewMessage(incoming=True))
+    await e.eor(get_string("blk_2").format(wrd))
 
 
-@ultroid_cmd(pattern="remblacklist ?(.*)", admins_only=True)
+@ultroid_cmd(pattern="remblacklist( (.*)|$)", admins_only=True)
 async def rf(e):
-    wrd = e.pattern_match.group(1)
+    wrd = e.pattern_match.group(1).strip()
     chat = e.chat_id
     if not wrd:
-        return await eod(e, "`Give the word to remove from blacklist..`")
+        return await e.eor(get_string("blk_3"), time=5)
     wrd = e.text[14:]
     heh = wrd.split(" ")
     for z in heh:
         rem_blacklist(int(chat), z.lower())
-    await eor(e, f"Done : `{wrd}` Removed from Blacklist.")
+    await e.eor(get_string("blk_4").format(wrd))
 
 
 @ultroid_cmd(pattern="listblacklist$", admins_only=True)
 async def lsnote(e):
-    x = list_blacklist(e.chat_id)
-    if x:
-        sd = "Blacklist Found In This Chats Are\n\n"
-        await eor(e, sd + x)
-    else:
-        await eor(e, "No Blacklist word Found Here")
+    if x := list_blacklist(e.chat_id):
+        sd = get_string("blk_5")
+        return await e.eor(sd + x)
+    await e.eor(get_string("blk_6"))
 
 
-@ultroid_bot.on(events.NewMessage(incoming=True))
-async def bl(e):
-    chat = e.chat_id
-    x = get_blacklist(int(chat))
-    if x and e.text:
-        xx = ((e.text).lower()).split()
-        yy = x.split("$|")
-        for z in xx:
-            if z in yy:
-                await e.delete()
-                break
+async def blacklist(e):
+    if x := get_blacklist(e.chat_id):
+        for z in e.text.lower().split():
+            for zz in x:
+                if z == zz:
+                    try:
+                        await e.delete()
+                        break
+                    except BaseException:
+                        break
+
+
+if udB.get_key("BLACKLIST_DB"):
+    ultroid_bot.add_handler(blacklist, events.NewMessage(incoming=True))

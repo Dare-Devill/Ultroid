@@ -1,5 +1,5 @@
 # Ultroid - UserBot
-# Copyright (C) 2021 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
@@ -9,45 +9,30 @@
 
 • {i}unsplash <search query> ; <no of pics>
     Unsplash Image Search.
-
 """
-import urllib
 
-import requests as r
-from bs4 import BeautifulSoup as bs
+from pyUltroid.fns.misc import unsplashsearch
 
-from . import *
+from . import asyncio, download_file, get_string, os, ultroid_cmd
 
 
-@ultroid_cmd(pattern="unsplash ?(.*)")
+@ultroid_cmd(pattern="unsplash( (.*)|$)")
 async def searchunsl(ult):
-    match = ult.pattern_match.group(1)
+    match = ult.pattern_match.group(1).strip()
     if not match:
-        return await eor(ult, "Give me Something to Search")
+        return await ult.eor("Give me Something to Search")
+    num = 5
     if ";" in match:
         num = int(match.split(";")[1])
-        query = match.split(";")[0]
-    else:
-        num = 5
-        query = match
-    tep = await eor(ult, "`Processing... `")
-    res = autopicsearch(query)
-    if len(res) == 0:
-        return await eod(ult, "No Results Found !")
-    qas = res[:num]
-    dir = "resources/downloads"
-    CL = []
-    nl = 0
-    for rp in qas:
-        li = "https://unsplash.com" + rp["href"]
-        ct = r.get(li).content
-        bst = bs(ct, "html.parser", from_encoding="utf-8")
-        ft = bst.find_all("img", "_2UpQX")[0]["src"]
-        Hp = dir + "img" + f"{nl}.png"
-        urllib.request.urlretrieve(ft, Hp)
-        CL.append(Hp)
-        nl += 1
+        match = match.split(";")[0]
+    tep = await ult.eor(get_string("com_1"))
+    res = await unsplashsearch(match, limit=num)
+    if not res:
+        return await ult.eor(get_string("unspl_1"), time=5)
+    CL = [download_file(rp, f"{match}-{e}.png") for e, rp in enumerate(res)]
+    imgs = [z for z in (await asyncio.gather(*CL)) if z]
     await ult.client.send_file(
-        ult.chat_id, CL, caption=f"Uploaded {len(qas)} Images\n", album=True
+        ult.chat_id, imgs, caption=f"Uploaded {len(imgs)} Images!"
     )
     await tep.delete()
+    [os.remove(img) for img in imgs]

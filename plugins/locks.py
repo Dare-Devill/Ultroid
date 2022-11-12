@@ -1,5 +1,5 @@
 # Ultroid - UserBot
-# Copyright (C) 2021 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
@@ -12,47 +12,28 @@
 
 • `{i}unlock <msgs/media/sticker/gif/games/inline/polls/invites/pin/changeinfo>`
     UNLOCK the Used Setting in Used Group.
-
 """
-from pyUltroid.functions.all import lucks, unlucks
 from telethon.tl.functions.messages import EditChatDefaultBannedRightsRequest
 
-from . import *
+from pyUltroid.fns.admins import lock_unlock
+
+from . import ultroid_cmd
 
 
 @ultroid_cmd(
-    pattern="lock ?(.*)",
-    groups_only=True,
-    admins_only=True,
-    type=["official", "manager"],
-    ignore_dualmode=True,
+    pattern="(un|)lock( (.*)|$)", admins_only=True, manager=True, require="change_info"
 )
-async def lockho(e):
-    mat = e.pattern_match.group(1)
+async def un_lock(e):
+    mat = e.pattern_match.group(2).strip()
     if not mat:
-        return await eod(e, "`Give some Proper Input..`")
+        return await e.eor("`Give some Proper Input..`", time=5)
+    lock = e.pattern_match.group(1) == ""
+    ml = lock_unlock(mat, lock)
+    if not ml:
+        return await e.eor("`Incorrect Input`", time=5)
+    msg = "Locked" if lock else "Unlocked"
     try:
-        ml = lucks(mat)
-    except BaseException:
-        return await eod(e, "`Incorrect Input`")
-    await e.client(EditChatDefaultBannedRightsRequest(e.chat_id, ml))
-    await eor(e, f"Locked - `{mat}` ! ")
-
-
-@ultroid_cmd(
-    pattern="unlock ?(.*)",
-    groups_only=True,
-    admins_only=True,
-    type=["official", "manager"],
-    ignore_dualmode=True,
-)
-async def unlckho(e):
-    mat = e.pattern_match.group(1)
-    if not mat:
-        return await eod(e, "`Give some Proper Input..`")
-    try:
-        ml = unlucks(mat)
-    except BaseException:
-        return await eod(e, "`Incorrect Input`")
-    await e.client(EditChatDefaultBannedRightsRequest(e.chat_id, ml))
-    await eor(e, f"Unlocked - `{mat}` ! ")
+        await e.client(EditChatDefaultBannedRightsRequest(e.chat_id, ml))
+    except Exception as er:
+        return await e.eor(str(er))
+    await e.eor(f"**{msg}** - `{mat}` ! ")

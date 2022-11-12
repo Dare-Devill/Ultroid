@@ -1,10 +1,9 @@
 # Ultroid - UserBot
-# Copyright (C) 2021 TeamUltroid
+# Copyright (C) 2021-2022 TeamUltroid
 #
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
 # <https://www.github.com/TeamUltroid/Ultroid/blob/main/LICENSE/>.
-
 """
 ✘ Commands Available -
 
@@ -35,56 +34,43 @@ from telethon.tl.types import ChannelParticipantCreator as owner
 from telethon.tl.types import UserStatusOffline as off
 from telethon.tl.types import UserStatusOnline as onn
 from telethon.tl.types import UserStatusRecently as rec
-from telethon.utils import get_display_name
 
-from . import *
+from . import inline_mention, ultroid_cmd
 
 
 @ultroid_cmd(
-    pattern="tag(on|off|all|bots|rec|admins|owner)?(.*)",
+    pattern="tag(on|off|all|bots|rec|admins|owner)( (.*)|$)",
     groups_only=True,
 )
 async def _(e):
     okk = e.text
     lll = e.pattern_match.group(2)
-    users = 0
     o = 0
     nn = 0
     rece = 0
-    if lll:
-        xx = f"{lll}"
-    else:
-        xx = ""
-    async for bb in e.client.iter_participants(e.chat_id, 99):
-        users = users + 1
+    xx = f"{lll}" if lll else ""
+    lili = await e.client.get_participants(e.chat_id, limit=99)
+    for bb in lili:
         x = bb.status
         y = bb.participant
         if isinstance(x, onn):
-            o = o + 1
+            o += 1
             if "on" in okk:
-                xx += f"\n[{get_display_name(bb)}](tg://user?id={bb.id})"
-        if isinstance(x, off):
-            nn = nn + 1
-            if "off" in okk:
-                if not (bb.bot or bb.deleted):
-                    xx += f"\n[{get_display_name(bb)}](tg://user?id={bb.id})"
-        if isinstance(x, rec):
-            rece = rece + 1
-            if "rec" in okk:
-                if not (bb.bot or bb.deleted):
-                    xx += f"\n[{get_display_name(bb)}](tg://user?id={bb.id})"
+                xx += f"\n{inline_mention(bb)}"
+        elif isinstance(x, off):
+            nn += 1
+            if "off" in okk and not bb.bot and not bb.deleted:
+                xx += f"\n{inline_mention(bb)}"
+        elif isinstance(x, rec):
+            rece += 1
+            if "rec" in okk and not bb.bot and not bb.deleted:
+                xx += f"\n{inline_mention(bb)}"
         if isinstance(y, owner):
-            if "admin" or "owner" in okk:
-                xx += f"\n꧁[{get_display_name(bb)}](tg://user?id={bb.id})꧂"
-        if isinstance(y, admin):
-            if "admin" in okk:
-                if not bb.deleted:
-                    xx += f"\n[{get_display_name(bb)}](tg://user?id={bb.id})"
-        if "all" in okk:
-            if not (bb.bot or bb.deleted):
-                xx += f"\n[{get_display_name(bb)}](tg://user?id={bb.id})"
-        if "bot" in okk:
-            if bb.bot:
-                xx += f"\n[{get_display_name(bb)}](tg://user?id={bb.id})"
-    await e.client.send_message(e.chat_id, xx)
-    await e.delete()
+            xx += f"\n꧁{inline_mention(bb)}꧂"
+        if isinstance(y, admin) and "admin" in okk and not bb.deleted:
+            xx += f"\n{inline_mention(bb)}"
+        if "all" in okk and not bb.bot and not bb.deleted:
+            xx += f"\n{inline_mention(bb)}"
+        if "bot" in okk and bb.bot:
+            xx += f"\n{inline_mention(bb)}"
+    await e.eor(xx)
